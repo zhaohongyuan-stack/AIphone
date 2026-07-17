@@ -1,0 +1,386 @@
+{
+  "info": {
+    "name": "AIPhone API",
+    "_postman_id": "aiphone-api-collection",
+    "description": "AIPhone 智能客服平台接口集合\n\n## 环境变量\n- baseUrl: 服务地址（本机 http://localhost:8080 或公网 http://8.152.96.62:8080）\n- instanceId: CCC 实例 ID\n- testContactId: 测试用 contactId（= conversationId = jobId）\n\n## 测试顺序\n1. 健康检查 → 确认服务正常\n2. 工单/坐席基础接口 → 确认 DB 通\n3. CCC 事件模拟 → 模拟完整通话流程\n4. 真实打电话联调",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://8.152.96.62:8080", "type": "string" },
+    { "key": "instanceId", "value": "demo-1334882287961657", "type": "string" },
+    { "key": "testContactId", "value": "job-test-001", "type": "string" },
+    { "key": "testPhone", "value": "13800138000", "type": "string" },
+    { "key": "testAgentId", "value": "agent002@demo-1334882287961657", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 健康检查",
+      "item": [
+        {
+          "name": "健康检查",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "test": [
+            {
+              "type": "javascript",
+              "exec": [
+                "pm.test('健康检查返回 UP', function () {",
+                "    pm.expect(pm.response.json().status).to.eql('UP');",
+                "});"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 工单管理",
+      "item": [
+        {
+          "name": "1.1 创建工单（IVR 调用）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.orderId) {",
+                  "    pm.collectionVariables.set('createdOrderId', jsonData.data.orderId);",
+                  "    console.log('已保存 createdOrderId=' + jsonData.data.orderId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{testPhone}}\",\n  \"conversationId\": \"{{testContactId}}\",\n  \"instanceId\": \"{{instanceId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/orders", "host": ["{{baseUrl}}"], "path": ["api", "orders"] }
+          }
+        },
+        {
+          "name": "1.2 工单列表（分页）",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?page=1&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.3 工单详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "1"]
+            }
+          }
+        },
+        {
+          "name": "1.4 更新工单（PATCH）",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entName\": \"测试企业有限公司\",\n  \"entAddress\": \"测试地址123号\",\n  \"contactName\": \"张三\",\n  \"bizSummary\": \"用户咨询营业执照办理流程，已告知所需材料\",\n  \"summaryConfirmed\": 1,\n  \"orderType\": 1,\n  \"aiSolved\": 1,\n  \"aiFailureNote\": \"无\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "1"]
+            }
+          }
+        },
+        {
+          "name": "1.5 按电话查历史工单",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/by-phone?phone=13900139006&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "by-phone"],
+              "query": [
+                { "key": "phone", "value": "13900139006" },
+                { "key": "limit", "value": "5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.6 工单状态变更（办结）",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"orderStatus\": 2\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/1/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "1", "confirm"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 坐席管理",
+      "item": [
+        {
+          "name": "2.1 坐席列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "list"]
+            }
+          }
+        },
+        {
+          "name": "2.2 更新坐席状态（上线）",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"agentId\": 2,\n  \"agentStatus\": 2\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 实时推送 SSE",
+      "item": [
+        {
+          "name": "3.1 订阅字幕流（SSE 长连接）",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/event-stream" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/dialogue/stream/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dialogue", "stream", "1"]
+            }
+          },
+          "description": "SSE 长连接，连接后先推历史对话，再挂起等实时推送。\nPostman 支持 SSE：发送后会持续接收 data: 消息。\n点 Stop 停止接收。"
+        },
+        {
+          "name": "3.2 模拟推送一条字幕",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": {
+              "raw": "{{baseUrl}}/test/push/1?content=这是一条Postman测试字幕&role=user",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "push", "1"],
+              "query": [
+                { "key": "content", "value": "这是一条Postman测试字幕" },
+                { "key": "role", "value": "user" }
+              ]
+            }
+          },
+          "description": "配合 3.1 一起用：先开 3.1 订阅 SSE，再调本接口，3.1 会立即收到这条字幕。"
+        },
+        {
+          "name": "3.3 查看活跃 SSE 连接数",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/emitters",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "emitters"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Redis 调试",
+      "item": [
+        {
+          "name": "4.1 Redis 总览",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/redis/overview",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "redis", "overview"]
+            }
+          }
+        },
+        {
+          "name": "4.2 查所有 Key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/redis/keys",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "redis", "keys"]
+            }
+          }
+        },
+        {
+          "name": "4.3 查指定 Key 值",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/redis/get?key=agent:status:{{testAgentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "redis", "get"],
+              "query": [{ "key": "key", "value": "agent:status:{{testAgentId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 CCC 事件模拟（联调用）",
+      "description": "模拟完整通话流程：振铃→分配→接通→字幕→挂断→录音就绪\n\n真实联调时这些事件由 CCC 通过 RocketMQ 推送，无需手动调。\n本组接口用于本地验证事件分发逻辑是否正确。\n\n建议按顺序执行 5.1 → 5.6",
+      "item": [
+        {
+          "name": "5.1 Ringing 振铃（来电）",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=Ringing&contactId={{testContactId}}&caller={{testPhone}}&callee=05710000&agentId={{testAgentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "Ringing" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "caller", "value": "{{testPhone}}" },
+                { "key": "callee", "value": "05710000" },
+                { "key": "agentId", "value": "{{testAgentId}}" }
+              ]
+            }
+          },
+          "description": "模拟来电振铃。会触发 WebSocket 广播 NEW_CALL 给所有坐席前端。\n\n前置：前端已连 ws://.../ws/call"
+        },
+        {
+          "name": "5.2 AssignAgent 分配坐席",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=AssignAgent&contactId={{testContactId}}&agentId={{testAgentId}}&queueType=SkillGroup",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "AssignAgent" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "agentId", "value": "{{testAgentId}}" },
+                { "key": "queueType", "value": "SkillGroup" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5.3 Established 接通（关键）",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=Established&contactId={{testContactId}}&agentId={{testAgentId}}&caller={{testPhone}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "Established" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "agentId", "value": "{{testAgentId}}" },
+                { "key": "caller", "value": "{{testPhone}}" }
+              ]
+            }
+          },
+          "description": "接通事件，核心步骤：\n1. 用 contactId 查工单（Python 应已创建）\n2. 工单状态 → 处理中(1)\n3. 关联 agentId\n4. WebSocket 推 ORDER_READY 给对应坐席\n5. 前端收到后订阅 SSE\n\n前置：先用 1.1 创建工单，conversationId 用 {{testContactId}}"
+        },
+        {
+          "name": "5.4 TextStream 字幕（多次调用）",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=TextStream&contactId={{testContactId}}&text=您好，请问有什么可以帮您&channelType=customer&finished=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "TextStream" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "text", "value": "您好，请问有什么可以帮您" },
+                { "key": "channelType", "value": "customer" },
+                { "key": "finished", "value": "true" }
+              ]
+            }
+          },
+          "description": "推送识别字幕。finished=true 时完整句子会：\n1. 写 Redis 缓冲 dialogue:buffer:{orderId}\n2. SSE 实时推给前端\n3. Released 时批量落库\n\n可多次调用模拟连续对话。改 text 参数试不同内容。"
+        },
+        {
+          "name": "5.5 Released 挂断（归档）",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=Released&contactId={{testContactId}}&caller={{testPhone}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "Released" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "caller", "value": "{{testPhone}}" }
+              ]
+            }
+          },
+          "description": "挂断事件：\n1. 停止 ASR\n2. flushDialogueBuffer 批量落库\n3. 工单状态 → 已办结(2)\n4. 关闭 SSE 连接"
+        },
+        {
+          "name": "5.6 RecordingReady 录音就绪",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/test/ccc/event?eventType=RecordingReady&contactId={{testContactId}}&agentId={{testAgentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["test", "ccc", "event"],
+              "query": [
+                { "key": "eventType", "value": "RecordingReady" },
+                { "key": "contactId", "value": "{{testContactId}}" },
+                { "key": "agentId", "value": "{{testAgentId}}" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

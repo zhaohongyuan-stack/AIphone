@@ -1,0 +1,44 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+# 内部开发文档（不入库，含核心原则、dev-log、规格文档等）
+# 如需共享给前端/智能客服团队，需手动传送或另立共享渠道
+docs/
+
+### 敏感凭证（不入库，本地联调用） ###
+# application-local.yml 含真实 AccessKey/Secret，禁止提交
+application-local.yml
+application-local.properties
+application-prod.yml
+*.local.yml

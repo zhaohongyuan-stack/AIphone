@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: AIPhone
+  datasource:
+    # Docker 端口映射 5433:5432（避开本机原生 PostgreSQL 5432）
+    url: jdbc:postgresql://localhost:5433/ai_phone
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      # Docker 端口映射 6380:6379（避开本机原生 Redis 6379）
+      port: 6380
+  rabbitmq:
+    host: localhost
+    # Docker 端口映射 5673:5672（避开本机原生 RabbitMQ 5672）
+    port: 5673
+    username: myuser
+    password: secret
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  docker:
+    compose:
+      # 禁用 Spring Boot 自动管理 docker-compose（用户已手动管理 PG/Redis 等服务）
+      enabled: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: 8080
+
+logging:
+  level:
+    # 屏蔽 RocketMQ 5.x gRPC Netty 保活/流控刷屏日志（Window: 1,048,576 高频 DEBUG）
+    # 用父包覆盖所有子包，无论实际路径是 shade.grpc.netty 还是 shade.io.grpc.netty
+    org.apache.rocketmq.shade: WARN
+    org.apache.rocketmq.shading: WARN
+    # gRPC 内部心跳/流控
+    io.grpc: WARN
+    # RocketMQ 客户端整体 INFO（保留消费/启动关键日志）
+    org.apache.rocketmq: INFO
+
+# 阿里云平台对接配置
+aliyun:
+  # ========== CCC 云呼叫中心 ==========
+  ccc:
+    # ---------- 总开关 ----------
+    # true: 连接真实阿里云 CCC（需填下方凭证，启动时 Fail-fast 校验必填项）
+    # false: 走本地 Noop 空实现（默认，适合开发测试）
+    enabled: false
+
+    # ---------- 实例与凭证（enabled=true 时必填，缺失则启动失败） ----------
+    # ★ 真实凭证请通过 application-local.yml 或环境变量注入，禁止硬编码到代码仓库
+    instance-id: ${CCC_INSTANCE_ID:demo-1334882287961657}
+    access-key-id: ${CCC_AK_ID:}          # AccessKey ID（建议环境变量注入）
+    access-key-secret: ${CCC_AK_SECRET:}  # ★强烈建议环境变量注入，禁止硬编码到代码仓库
+
+    # ---------- 地域与端点 ----------
+    region-id: cn-beijing                 # 服务地域：cn-shanghai / cn-beijing
+    # api-endpoint: ccc.cn-beijing.aliyuncs.com  # （可选）自定义网关地址，留空自动拼接
+
+    # ---------- 本地回调接收路径（仅 Mock 测试用，真实事件走 RocketMQ） ----------
+    callback-path: /api/aliyun/ccc/callback
+
+    # ---------- 音频流来源（解决"音频从哪来"，等文档确认后改此枚举切换） ----------
+    # NONE: 不接入音频（本阶段默认，用 CCC 自带 TextStream 事件）
+    # CALLBACK_BODY: 回调请求体中直接携带音频（需文档确认）
+    # WEBSOCKET_PULL: 通过 WebSocket 主动拉取音频流（需额外实现）
+    audio-source-type: NONE
+
+    # ---------- 网络超时（Duration 格式：30s / 1m 等） ----------
+    timeout:
+      connect: 30s
+      read: 30s
+
+    # ---------- RocketMQ 事件订阅（联调阶段启用） ----------
+    # CCC 事件推送机制：CCC → RocketMQ Topic → 我方 Consumer 拉取
+    # 不支持 Webhook HTTP 回调，本地开发无需公网暴露
+    # ★ 真实凭证请通过 application-local.yml 注入
+    mq:
+      enabled: ${CCC_MQ_ENABLED:false}
+      endpoint: ${CCC_MQ_ENDPOINT:}       # RocketMQ 4.0 公网 TCP 接入点
+      topic: ${CCC_MQ_TOPIC:testTopic}    # Topic 名称（与 CCC 控制台一致）
+      consumer-group: ${CCC_MQ_GROUP:GID_CCC_TEST_CONSUMER}  # 消费者 Group ID
+      consume-thread: 20                  # 消费线程数
+      max-reconsume-times: 5              # 消费失败重试次数
+
+  # ========== DashScope Gummy 实时语音识别 ==========
+  voice:
+    # DashScope API Key（建议通过环境变量 DASHSCOPE_API_KEY 注入）
+    api-key: ${DASHSCOPE_API_KEY:}
+    model: gummy-realtime-v1
+    format: pcm
+    sample-rate: 16000
+    source-language: zh
