@@ -1,0 +1,90 @@
+{
+  "scripts": [
+    {
+      "id": "consultation_basic",
+      "description": "企业咨询基本流程（AI解决）",
+      "order_type": 1,
+      "welcome": "您好，欢迎致电大东区市场监督管理局，请问有什么可以帮您？",
+      "turns": [
+        {
+          "keywords": ["营业执照", "办理"],
+          "user_input": "我想咨询营业执照办理流程",
+          "bot_response": "营业执照办理流程如下：1. 准备相关材料 2. 提交申请 3. 等待审核 4. 领取执照。请问您需要了解哪一步的详细情况？",
+          "commands": []
+        },
+        {
+          "keywords": ["材料", "需要什么"],
+          "user_input": "需要什么材料",
+          "bot_response": "办理营业执照需要以下材料：1. 申请人身份证明 2. 经营场所证明 3. 企业名称预先核准通知书 4. 公司章程。",
+          "commands": []
+        },
+        {
+          "keywords": ["谢谢", "没了", "好的"],
+          "user_input": "好的谢谢",
+          "bot_response": "不客气，感谢您的来电，再见！",
+          "commands": []
+        }
+      ]
+    },
+    {
+      "id": "transfer_to_human",
+      "description": "用户要求转人工",
+      "order_type": 1,
+      "welcome": "您好，请问有什么可以帮您？",
+      "turns": [
+        {
+          "keywords": ["咨询", "问题"],
+          "user_input": "我有个问题想咨询",
+          "bot_response": "好的，请问您想咨询什么问题？",
+          "commands": []
+        },
+        {
+          "keywords": ["转人工", "人工服务", "人工客服"],
+          "user_input": "我要转人工服务",
+          "bot_response": "好的，正在为您转接人工客服，请稍候。",
+          "commands": [{"Type": "Transfer", "Reason": "用户要求转人工"}]
+        }
+      ]
+    },
+    {
+      "id": "complaint_basic",
+      "description": "投诉基本流程（AI解决）",
+      "order_type": 2,
+      "welcome": "您好，这里是投诉热线，请问您要投诉什么？",
+      "turns": [
+        {
+          "keywords": ["投诉", "举报", "卫生"],
+          "user_input": "我要投诉一家餐饮店卫生问题",
+          "bot_response": "好的，请问您要投诉的企业名称和地址是什么？",
+          "commands": []
+        },
+        {
+          "keywords": ["企业", "地址", "餐厅", "路"],
+          "user_input": "企业叫大东餐厅，在大东路123号",
+          "bot_response": "已记录您的投诉信息：大东餐厅，大东路123号。请问您能提供联系方式吗？我们会尽快处理并回复您。",
+          "commands": []
+        },
+        {
+          "keywords": ["电话", "联系", "138"],
+          "user_input": "我的电话是13800138001",
+          "bot_response": "好的，您的投诉已受理，我们会在3个工作日内处理并回复您。请问还有其他问题吗？",
+          "commands": []
+        }
+      ]
+    },
+    {
+      "id": "default_fallback",
+      "description": "默认流程（未命中关键词时使用）",
+      "order_type": 1,
+      "welcome": "您好，欢迎致电大东区市场监督管理局，请问有什么可以帮您？",
+      "turns": [
+        {
+          "keywords": ["你好", "您好"],
+          "user_input": "你好",
+          "bot_response": "您好，请问有什么可以帮您？您可以咨询企业相关问题或进行投诉。",
+          "commands": []
+        }
+      ]
+    }
+  ]
+}

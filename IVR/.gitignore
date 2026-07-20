@@ -1,0 +1,14 @@
+# 环境变量（含敏感信息）
+.env
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# 非代码文件
+*.pdf
+*.xlsx

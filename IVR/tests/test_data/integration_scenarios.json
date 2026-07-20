@@ -1,0 +1,81 @@
+{
+  "scenarios": [
+    {
+      "id": "consultation_ai_resolved",
+      "description": "企业咨询-AI解决",
+      "phone": "13900139001",
+      "conversation_id": "conv-e2e-001",
+      "ivr_key": "1",
+      "script_id": "consultation_basic",
+      "dialogues": [
+        "我想咨询营业执照办理流程",
+        "需要什么材料",
+        "好的谢谢"
+      ],
+      "hangup_dir": "User",
+      "expect_ai_solved": true,
+      "expect_transfer": false,
+      "expect_order_type": 1
+    },
+    {
+      "id": "consultation_transfer_to_human",
+      "description": "企业咨询-转人工",
+      "phone": "13900139002",
+      "conversation_id": "conv-e2e-002",
+      "ivr_key": "1",
+      "script_id": "transfer_to_human",
+      "dialogues": [
+        "我有个问题想咨询",
+        "我要转人工服务"
+      ],
+      "hangup_dir": "Agent",
+      "expect_ai_solved": false,
+      "expect_transfer": true,
+      "expect_order_type": 1
+    },
+    {
+      "id": "complaint_ai_resolved",
+      "description": "投诉-AI解决",
+      "phone": "13900139003",
+      "conversation_id": "conv-e2e-003",
+      "ivr_key": "2",
+      "script_id": "complaint_basic",
+      "dialogues": [
+        "我要投诉一家餐饮店卫生问题",
+        "企业叫大东餐厅，在大东路123号",
+        "我的电话是13800138001"
+      ],
+      "hangup_dir": "User",
+      "expect_ai_solved": true,
+      "expect_transfer": false,
+      "expect_order_type": 2
+    },
+    {
+      "id": "direct_transfer",
+      "description": "直接转人工（按键0）",
+      "phone": "13900139004",
+      "conversation_id": "conv-e2e-004",
+      "ivr_key": "0",
+      "script_id": null,
+      "dialogues": [],
+      "hangup_dir": "Agent",
+      "expect_ai_solved": false,
+      "expect_transfer": true,
+      "expect_order_type": 1
+    },
+    {
+      "id": "queue_waiting",
+      "description": "排队等待（槽位满后释放自动分配）",
+      "phone": "13900139005",
+      "conversation_id": "conv-e2e-005",
+      "ivr_key": "1",
+      "script_id": "consultation_basic",
+      "dialogues": ["我想咨询营业执照办理流程"],
+      "hangup_dir": "User",
+      "expect_ai_solved": true,
+      "expect_transfer": false,
+      "expect_order_type": 1,
+      "pre_fill_slots": true
+    }
+  ]
+}

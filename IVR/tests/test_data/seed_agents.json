@@ -1,0 +1,14 @@
+[
+  {
+    "agent_name": "测试坐席A",
+    "agent_status": 1,
+    "ccc_user_id": "test_agent_a@ccc-test",
+    "skill_group_id": "综合咨询组"
+  },
+  {
+    "agent_name": "测试坐席B",
+    "agent_status": 1,
+    "ccc_user_id": "test_agent_b@ccc-test",
+    "skill_group_id": "投诉处理组"
+  }
+]

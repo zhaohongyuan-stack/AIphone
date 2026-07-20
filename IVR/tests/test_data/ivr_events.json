@@ -1,0 +1,77 @@
+{
+  "call_started": {
+    "EventType": "CallStarted",
+    "ConversationId": "conv-test-001",
+    "Caller": "13800138001",
+    "InstanceId": "ccc-test-instance"
+  },
+  "ivr_key_1": {
+    "EventType": "IvrKeyPressed",
+    "ConversationId": "conv-test-001",
+    "Key": "1"
+  },
+  "call_started_2": {
+    "EventType": "CallStarted",
+    "ConversationId": "conv-test-002",
+    "Caller": "13800138002",
+    "InstanceId": "ccc-test-instance"
+  },
+  "ivr_key_2": {
+    "EventType": "IvrKeyPressed",
+    "ConversationId": "conv-test-002",
+    "Key": "2"
+  },
+  "call_started_3": {
+    "EventType": "CallStarted",
+    "ConversationId": "conv-test-003",
+    "Caller": "13800138003",
+    "InstanceId": "ccc-test-instance"
+  },
+  "ivr_key_0": {
+    "EventType": "IvrKeyPressed",
+    "ConversationId": "conv-test-003",
+    "Key": "0"
+  },
+  "call_started_unknown": {
+    "EventType": "CallStarted",
+    "ConversationId": "conv-test-004",
+    "Caller": "13800138004",
+    "InstanceId": "ccc-test-instance"
+  },
+  "ivr_key_9": {
+    "EventType": "IvrKeyPressed",
+    "ConversationId": "conv-test-004",
+    "Key": "9"
+  },
+  "call_hangup_user": {
+    "EventType": "CallHangup",
+    "ConversationId": "conv-test-001",
+    "HangupDir": "User"
+  },
+  "call_hangup_agent": {
+    "EventType": "CallHangup",
+    "ConversationId": "conv-test-002",
+    "HangupDir": "Agent"
+  },
+  "asr_result": {
+    "EventType": "AsrSentenceResult",
+    "ConversationId": "conv-test-001",
+    "Role": "caller",
+    "Text": "我想咨询营业执照办理流程"
+  },
+  "agent_status_ready": {
+    "EventType": "AgentStatusChange",
+    "UserId": "test_agent_a@ccc-test",
+    "State": "READY"
+  },
+  "agent_status_busy": {
+    "EventType": "AgentStatusChange",
+    "UserId": "test_agent_a@ccc-test",
+    "State": "BUSY"
+  },
+  "recording_ready": {
+    "EventType": "RecordingReady",
+    "ConversationId": "conv-test-001",
+    "FileUrl": "http://example.com/recording.wav"
+  }
+}

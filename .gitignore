@@ -1,0 +1,54 @@
+# ===== 内部文档（不迁移到 GitHub）=====
+# docx/ 目录含联调指导、需求文档、学习日志等内部文档，仅本地保留
+docx/
+
+# ===== 项目副本 / 打包产物 =====
+# IVR/opt/ 下为项目打包副本，不入库
+IVR/opt/
+
+# ===== 敏感凭证 =====
+# 环境变量含真实 AccessKey/Secret/数据库密码
+.env
+**/.env
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# ===== Java =====
+target/
+*.class
+*.jar
+*.war
+.mvn/wrapper/maven-wrapper.jar
+
+# ===== 日志 =====
+logs/
+*.log
+*.log.*
+aiphone-src/logs/
+
+# ===== 数据库文件 =====
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+
+# ===== 临时文件 =====
+*.bak
+*.tmp
+*.swp

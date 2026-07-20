@@ -1,0 +1,4 @@
+pytest>=7.0
+httpx>=0.24
+oss2>=2.18
+alibabacloud_openapi_util>=1.0
