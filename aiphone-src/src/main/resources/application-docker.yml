@@ -48,9 +48,13 @@ aliyun:
     mq:
       enabled: true
       endpoint: ${CCC_MQ_ENDPOINT}
-      topic: ${CCC_MQ_TOPIC:testTopic}
+      topic: ${CCC_MQ_TOPIC:dadong}
       # Java 端消费组（建议与 Python 端分开，见学习日志问题 2）
       consumer-group: ${CCC_MQ_GROUP:GID_CCC_JAVA_CONSUMER}
+      # RocketMQ 5.x 公网访问必须填写实例用户名/密码/命名空间（实例ID）
+      username: ${CCC_MQ_USERNAME}
+      password: ${CCC_MQ_PASSWORD}
+      namespace: ${CCC_MQ_NAMESPACE}
       consume-thread: 20
       max-reconsume-times: 5
 

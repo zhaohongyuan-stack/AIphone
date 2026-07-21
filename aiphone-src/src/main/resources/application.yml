@@ -90,9 +90,12 @@ aliyun:
     # ★ 真实凭证请通过 application-local.yml 注入
     mq:
       enabled: ${CCC_MQ_ENABLED:false}
-      endpoint: ${CCC_MQ_ENDPOINT:}       # RocketMQ 4.0 公网 TCP 接入点
-      topic: ${CCC_MQ_TOPIC:testTopic}    # Topic 名称（与 CCC 控制台一致）
-      consumer-group: ${CCC_MQ_GROUP:GID_CCC_TEST_CONSUMER}  # 消费者 Group ID
+      endpoint: ${CCC_MQ_ENDPOINT:}       # RocketMQ 5.x 公网 gRPC 接入点
+      topic: ${CCC_MQ_TOPIC:dadong}       # Topic 名称（与 CCC 控制台一致）
+      consumer-group: ${CCC_MQ_GROUP:GID_CCC_JAVA_CONSUMER}  # 消费者 Group ID
+      username: ${CCC_MQ_USERNAME:}       # RocketMQ 实例用户名（公网访问必填）
+      password: ${CCC_MQ_PASSWORD:}       # RocketMQ 实例密码（公网访问必填）
+      namespace: ${CCC_MQ_NAMESPACE:}     # RocketMQ 实例 ID（如 rmq-cn-xxx）
       consume-thread: 20                  # 消费线程数
       max-reconsume-times: 5              # 消费失败重试次数
 

@@ -68,8 +68,12 @@ services:
       CCC_INSTANCE_ID: demo-1334882287961657
       # RocketMQ
       CCC_MQ_ENDPOINT: ${ROCKETMQ_ENDPOINT}
-      CCC_MQ_TOPIC: testTopic
+      CCC_MQ_TOPIC: dadong
       CCC_MQ_GROUP: GID_CCC_JAVA_CONSUMER
+      # RocketMQ 5.x 公网访问必须填写实例用户名/密码/命名空间（实例ID）
+      CCC_MQ_USERNAME: ${ROCKETMQ_ACCESS_KEY}
+      CCC_MQ_PASSWORD: ${ROCKETMQ_ACCESS_SECRET}
+      CCC_MQ_NAMESPACE: ${ROCKETMQ_INSTANCE_ID}
       # DashScope ASR
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
       TZ: Asia/Shanghai
