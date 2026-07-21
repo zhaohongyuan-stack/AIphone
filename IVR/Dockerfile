@@ -5,14 +5,20 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安装系统依赖（psycopg2-binary 需要 libpq，openpyxl 无额外依赖）
+# 使用阿里云 Debian 镜像源（加速国内 ECS 下载）
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list 2>/dev/null || true
+
+# 安装系统依赖（psycopg2-binary 自带 libpq，不需要 gcc 编译）
+# 仅安装 libpq-dev 供 psycopg2-binary 运行时动态链接
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libpq-dev && \
+    apt-get install -y --no-install-recommends libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
 # 先复制 requirements 利用 Docker 缓存
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 使用阿里云 pip 镜像源加速
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 
 # 复制应用代码
 COPY . .

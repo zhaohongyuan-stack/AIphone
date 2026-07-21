@@ -65,6 +65,14 @@ aliyun:
     sample-rate: 16000
     source-language: zh
 
+# 认证配置（JWT Token 签名密钥 + 管理员账号初始化）
+auth:
+  jwt-secret: ${JWT_SECRET:aiphone-docker-jwt-secret-key-2026-min32chars!!}
+  token-expires-seconds: 28800
+  bootstrap-username: admin
+  bootstrap-password: ${ADMIN_PASSWORD:admin123}
+  bootstrap-display-name: 管理员
+
 logging:
   level:
     com.fengrui.aiphone: DEBUG
