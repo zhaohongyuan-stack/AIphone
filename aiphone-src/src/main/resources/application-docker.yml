@@ -1,0 +1,76 @@
+# ==================== Docker 部署 profile ====================
+# 与 docker-compose.yml 配合使用，服务名作为主机名
+# 启动方式：SPRING_PROFILES_ACTIVE=docker
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/ai_phone
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password:
+
+  # Docker 环境首次启动自动建表，首次建表后改为 never 避免重复执行
+  sql:
+    init:
+      mode: never
+      schema-locations: classpath:schema.sql
+
+  # 排除未使用的 RabbitMQ 自动配置
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+# CCC 对接（Docker 环境启用真实事件消费）
+aliyun:
+  ccc:
+    enabled: true
+    instance-id: ${CCC_INSTANCE_ID:demo-1334882287961657}
+    access-key-id: ${CCC_AK_ID}
+    access-key-secret: ${CCC_AK_SECRET}
+    region-id: cn-beijing
+    callback-path: /api/aliyun/ccc/callback
+    audio-source-type: NONE
+    timeout:
+      connect: 30s
+      read: 30s
+    mq:
+      enabled: true
+      endpoint: ${CCC_MQ_ENDPOINT}
+      topic: ${CCC_MQ_TOPIC:testTopic}
+      # Java 端消费组（建议与 Python 端分开，见学习日志问题 2）
+      consumer-group: ${CCC_MQ_GROUP:GID_CCC_JAVA_CONSUMER}
+      consume-thread: 20
+      max-reconsume-times: 5
+
+  voice:
+    api-key: ${DASHSCOPE_API_KEY:}
+    model: gummy-realtime-v1
+    format: pcm
+    sample-rate: 16000
+    source-language: zh
+
+logging:
+  level:
+    com.fengrui.aiphone: DEBUG
+    org.apache.rocketmq.shade: WARN
+    org.apache.rocketmq.shading: WARN
+    io.grpc: WARN
+    org.apache.rocketmq: INFO
+  file:
+    name: /app/logs/aiphone.log
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30

@@ -26,6 +26,7 @@ from core import redis_manager as rm
 from core.aliyun_client import aliyun
 from core.knowledge_base import kb
 from core.llm_skill import llm_skill
+from core.java_client import java_client
 from core import logger as log
 
 router = APIRouter()
@@ -108,22 +109,34 @@ def create_order(payload: OrderCreate, db: Session = Depends(get_db)):
     """
     IVR阶段创建空工单
     用户拨入电话、CCC创建通话后立即调用
+    通过 Java API 创建，不直接操作数据库
     """
-    order = WorkOrder(
-        phone=payload.phone,
-        conversation_id=payload.conversation_id,
-        instance_id=payload.instance_id,
-        order_type=payload.order_type,
-        order_status=1,
-        call_start_time=datetime.now(),
-        created_time=datetime.now(),
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-
-    log.incoming_call(payload.phone, order.order_id)
-    return {"code": 200, "data": {"order_id": order.order_id}}
+    try:
+        result = java_client.create_order(
+            phone=payload.phone,
+            conversation_id=payload.conversation_id,
+            instance_id=payload.instance_id,
+            order_type=payload.order_type,
+        )
+        order_id = result.get("orderId")
+        log.incoming_call(payload.phone, order_id)
+        return {"code": 200, "data": {"order_id": order_id}}
+    except Exception as e:
+        log.error(f"通过 Java API 创建工单失败，降级直接写库: {e}")
+        order = WorkOrder(
+            phone=payload.phone,
+            conversation_id=payload.conversation_id,
+            instance_id=payload.instance_id,
+            order_type=payload.order_type,
+            order_status=1,
+            call_start_time=datetime.now(),
+            created_time=datetime.now(),
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        log.incoming_call(payload.phone, order.order_id)
+        return {"code": 200, "data": {"order_id": order.order_id}}
 
 
 @router.get("/api/orders/{order_id}")
@@ -160,17 +173,21 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 @router.put("/api/orders/{order_id}")
 def update_order(order_id: int, payload: OrderUpdate,
                  db: Session = Depends(get_db)):
-    """更新工单（理解Skill提取后/坐席填写后）"""
-    order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
-    if not order:
-        raise HTTPException(404, "工单不存在")
-
+    """更新工单（理解Skill提取后/坐席填写后），通过 Java API 更新"""
     update_data = payload.model_dump(exclude_unset=True)
-    for k, v in update_data.items():
-        setattr(order, k, v)
-    order.update_time = datetime.now()
-    db.commit()
-    return {"code": 200, "message": "更新成功"}
+    try:
+        java_client.update_order(order_id, **update_data)
+        return {"code": 200, "message": "更新成功"}
+    except Exception as e:
+        log.error(f"通过 Java API 更新工单失败，降级直接写库: {e}")
+        order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
+        if not order:
+            raise HTTPException(404, "工单不存在")
+        for k, v in update_data.items():
+            setattr(order, k, v)
+        order.update_time = datetime.now()
+        db.commit()
+        return {"code": 200, "message": "更新成功"}
 
 
 @router.get("/api/orders/by-phone/{phone}")
@@ -217,46 +234,47 @@ def dispatch_order(order_id: int, payload: DispatchRequest,
                    db: Session = Depends(get_db)):
     """
     工单完结流转推送
-    将工单数据推送到后端处理人员系统
+    通过 Java API 办结工单，构建推送数据返回
     """
+    # 通过 Java API 办结工单
+    try:
+        java_client.dispatch_order(order_id)
+    except Exception as e:
+        log.error(f"通过 Java API 流转工单失败，降级直接写库: {e}")
+        order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
+        if order:
+            order.order_status = 2
+            order.call_end_time = datetime.now()
+            order.update_time = datetime.now()
+            db.commit()
+
+    # 查询工单信息构建推送数据
     order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
-    if not order:
-        raise HTTPException(404, "工单不存在")
-
-    # 标记工单为已办结
-    order.order_status = 2
-    order.call_end_time = datetime.now()
-    order.update_time = datetime.now()
-    db.commit()
-
-    # 构建推送数据
     history = rm.get_history(order_id)
     dispatch_data = {
-        "order_id": order.order_id,
-        "conversation_id": order.conversation_id,
-        "phone": order.phone,
-        "ent_name": order.ent_name,
-        "ent_address": order.ent_address,
-        "ent_cerdit": order.ent_cerdit,
-        "contact_name": order.contact_name,
-        "order_type": order.order_type,
-        "order_status": order.order_status,
-        "agent_id": order.agent_id,
-        "biz_summary": order.biz_summary,
-        "ai_solved": order.ai_solved,
-        "ai_failure_note": order.ai_failure_note,
-        "call_start_time": order.call_start_time.isoformat() if order.call_start_time else None,
-        "call_end_time": order.call_end_time.isoformat() if order.call_end_time else None,
+        "order_id": order_id,
+        "conversation_id": order.conversation_id if order else None,
+        "phone": order.phone if order else None,
+        "ent_name": order.ent_name if order else None,
+        "ent_address": order.ent_address if order else None,
+        "ent_cerdit": order.ent_cerdit if order else None,
+        "contact_name": order.contact_name if order else None,
+        "order_type": order.order_type if order else None,
+        "order_status": 2,
+        "agent_id": order.agent_id if order else None,
+        "biz_summary": order.biz_summary if order else None,
+        "ai_solved": order.ai_solved if order else None,
+        "ai_failure_note": order.ai_failure_note if order else None,
+        "call_start_time": order.call_start_time.isoformat() if order and order.call_start_time else None,
+        "call_end_time": order.call_end_time.isoformat() if order and order.call_end_time else None,
         "dialogue_summary": history,
         "dispatch_time": datetime.now().isoformat(),
         "receiver": payload.receiver,
     }
 
-    # 实际场景: 推送到MQ / Webhook / 共享表
-    # 这里仅记录日志并返回推送数据
     log.order_dispatched(order_id)
     duration = 0
-    if order.call_start_time and order.call_end_time:
+    if order and order.call_start_time and order.call_end_time:
         duration = int((order.call_end_time - order.call_start_time).total_seconds())
     log.order_completed(order_id, duration)
 
@@ -809,23 +827,41 @@ def robot_dialogue(payload: RobotDialogueRequest, db: Session = Depends(get_db))
     try:
         extracted = llm_skill.understand(history)
         log.skill_extract(json.dumps(extracted, ensure_ascii=False))
-        # 更新工单（biz_summary 除外，biz_summary 由人工办结时生成）
+        # 更新工单（biz_summary 除外，biz_summary 由人工办结时生成，通过 Java API 落库）
         order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
         if order:
+            update_data = {}
             if extracted.get("ent_name"):
-                order.ent_name = extracted["ent_name"]
+                update_data["ent_name"] = extracted["ent_name"]
             if extracted.get("ent_address"):
-                order.ent_address = extracted["ent_address"]
+                update_data["ent_address"] = extracted["ent_address"]
             if extracted.get("ent_cerdit"):
-                order.ent_cerdit = extracted["ent_cerdit"]
+                update_data["ent_cerdit"] = extracted["ent_cerdit"]
             if extracted.get("contact_name"):
-                order.contact_name = extracted["contact_name"]
+                update_data["contact_name"] = extracted["contact_name"]
             if extracted.get("phone"):
-                order.phone = extracted["phone"]
+                update_data["phone"] = extracted["phone"]
             if extracted.get("order_type") is not None:
-                order.order_type = extracted["order_type"]
-            order.update_time = datetime.now()
-            db.commit()
+                update_data["order_type"] = extracted["order_type"]
+            if update_data:
+                try:
+                    java_client.update_order(order_id, **update_data)
+                except Exception as e:
+                    log.error(f"通过 Java API 更新工单信息失败，降级直接写库: orderId={order_id}, error={e}")
+                    if "ent_name" in update_data:
+                        order.ent_name = update_data["ent_name"]
+                    if "ent_address" in update_data:
+                        order.ent_address = update_data["ent_address"]
+                    if "ent_cerdit" in update_data:
+                        order.ent_cerdit = update_data["ent_cerdit"]
+                    if "contact_name" in update_data:
+                        order.contact_name = update_data["contact_name"]
+                    if "phone" in update_data:
+                        order.phone = update_data["phone"]
+                    if "order_type" in update_data:
+                        order.order_type = update_data["order_type"]
+                    order.update_time = datetime.now()
+                    db.commit()
 
         # 7. 填写Skill: 若有缺失字段，生成追问话术
         missing = extracted.get("missing_fields", [])
@@ -937,18 +973,11 @@ def get_agent_queue():
 def agent_accept_order(payload: dict = Body(...), db: Session = Depends(get_db)):
     """
     人工坐席接单（从队列取工单）
-    1. 从人工队列取出下一个工单
-    2. 设置 call_start_time（人工开始处理时间）
-    3. 绑定 agent_id
-    4. 更新坐席状态为 busy
+    通过 Java API 事务性更新工单 + 坐席状态
     """
     agent_id = payload.get("agent_id")
     if not agent_id:
         raise HTTPException(400, "缺少 agent_id")
-
-    agent = db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).first()
-    if not agent:
-        raise HTTPException(404, "坐席不存在")
 
     # 优先从队列取
     queue_item = rm.dequeue_agent()
@@ -960,50 +989,51 @@ def agent_accept_order(payload: dict = Body(...), db: Session = Depends(get_db))
         if not order_id:
             raise HTTPException(404, "队列为空且未指定 order_id")
 
-    order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
-    if not order:
-        raise HTTPException(404, f"工单 #{order_id} 不存在")
-
-    # 更新工单
-    order.agent_id = agent_id
-    order.call_start_time = datetime.now()
-    order.order_status = 1  # 处理中
-    order.update_time = datetime.now()
-    db.commit()
-
-    # 更新坐席状态
-    agent.agent_status = 1
-
-    rm.set_agent_status(agent_id, "busy")
-    db.commit()
-
-    log.agent_answer(agent.agent_name, order_id)
-    log.info(f"[人工接单] 坐席 {agent.agent_name} 接手工单#{order_id}")
-
-    return {
-        "code": 200,
-        "message": "接单成功",
-        "data": {
-            "order_id": order.order_id,
-            "phone": order.phone,
-            "conversation_id": order.conversation_id,
-            "instance_id": order.instance_id,
-            "ent_name": order.ent_name,
-            "ent_address": order.ent_address,
-            "ent_cerdit": order.ent_cerdit,
-            "contact_name": order.contact_name,
-            "order_type": order.order_type,
-            "order_status": order.order_status,
-            "agent_id": order.agent_id,
-            "biz_summary": order.biz_summary,
-            "ai_solved": order.ai_solved,
-            "ai_failure_note": order.ai_failure_note,
-            "call_start_time": order.call_start_time.isoformat() if order.call_start_time else None,
-            "call_end_time": order.call_end_time.isoformat() if order.call_end_time else None,
-            "created_time": order.created_time.isoformat() if order.created_time else None,
-            "update_time": order.update_time.isoformat() if order.update_time else None,
+    # 通过 Java API 事务性接单
+    try:
+        result = java_client.accept_order(agent_id, order_id)
+        rm.set_agent_status(agent_id, "busy")
+        log.info(f"[人工接单] 坐席#{agent_id} 接手工单#{order_id}")
+        # 查询工单信息返回给前端
+        order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
+        return {
+            "code": 200,
+            "message": "接单成功",
+            "data": {
+                "order_id": order_id,
+                "phone": order.phone if order else None,
+                "conversation_id": order.conversation_id if order else None,
+                "agent_id": agent_id,
+                "call_start_time": result.get("callStartTime"),
+            }
         }
-    }
+    except Exception as e:
+        log.error(f"通过 Java API 接单失败，降级直接写库: {e}")
+        agent = db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(404, "坐席不存在")
+        order = db.query(WorkOrder).filter(WorkOrder.order_id == order_id).first()
+        if not order:
+            raise HTTPException(404, f"工单 #{order_id} 不存在")
+        order.agent_id = agent_id
+        order.call_start_time = datetime.now()
+        order.order_status = 1
+        order.update_time = datetime.now()
+        agent.agent_status = 1
+        rm.set_agent_status(agent_id, "busy")
+        db.commit()
+        log.agent_answer(agent.agent_name, order_id)
+        return {
+            "code": 200,
+            "message": "接单成功",
+            "data": {
+                "order_id": order.order_id,
+                "phone": order.phone,
+                "conversation_id": order.conversation_id,
+                "agent_id": agent_id,
+                "call_start_time": order.call_start_time.isoformat() if order.call_start_time else None,
+            }
+        }
 
 
 @router.post("/api/agent/dialogue")
@@ -1025,14 +1055,14 @@ def agent_dialogue(payload: dict = Body(...), db: Session = Depends(get_db)):
     if not order:
         raise HTTPException(404, f"工单 #{order_id} 不存在")
 
-    # 保存到 PostgreSQL
-    dialogue = DialogueDetail(
-        order_id=order_id,
-        content=message,
-        role=role,
-    )
-    db.add(dialogue)
-    db.commit()
+    # 保存到 PostgreSQL（通过 Java API 落库 dialogue_detail）
+    try:
+        java_client.save_dialogue(order_id, message, role)
+    except Exception as e:
+        log.error(f"通过 Java API 保存坐席对话失败，降级直接写库: orderId={order_id}, error={e}")
+        dialogue = DialogueDetail(order_id=order_id, content=message, role=role)
+        db.add(dialogue)
+        db.commit()
 
     # 追加到 Redis 历史对话（供 LLM 摘要使用）
     rm.append_history(order_id, role, message)
@@ -1087,23 +1117,27 @@ def agent_complete_order(payload: dict = Body(...), db: Session = Depends(get_db
         if not biz_summary or not biz_summary.strip():
             biz_summary = f"人工坐席#{agent_id} 已处理工单#{order_id}"
 
-    # 更新工单
-    order.biz_summary = biz_summary
-    order.call_end_time = datetime.now()
-    order.order_status = 2  # 已办结
-    order.ai_solved = 0  # 转人工的工单 ai_solved = 0
-    order.update_time = datetime.now()
-    db.commit()
+    # 通过 Java API 办结工单（事务性更新 work_order + agent_info）
+    try:
+        java_client.complete_order(order_id, agent_id, biz_summary)
+    except Exception as e:
+        log.error(f"通过 Java API 办结失败，降级直接写库: orderId={order_id}, error={e}")
+        order.biz_summary = biz_summary
+        order.call_end_time = datetime.now()
+        order.order_status = 2  # 已办结
+        order.ai_solved = 0  # 转人工的工单 ai_solved = 0
+        order.update_time = datetime.now()
+        db.commit()
+        if agent_id:
+            agent = db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).first()
+            if agent:
+                agent.agent_status = 2
+                db.commit()
 
-    # 释放坐席状态
+    # Redis 状态同步
     if agent_id:
-        agent = db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).first()
-        if agent:
-            agent.agent_status = 2
-        
-            rm.set_agent_status(agent_id, "idle")
-            db.commit()
-            log.info(f"[人工办结] 坐席 {agent.agent_name} 释放")
+        rm.set_agent_status(agent_id, "idle")
+        log.info(f"[人工办结] 坐席 {agent_id} 释放")
 
     log.order_completed(order_id, 0)
     log.order_dispatched(order_id)
@@ -1115,16 +1149,20 @@ def agent_complete_order(payload: dict = Body(...), db: Session = Depends(get_db
         next_id = next_order["order_id"]
         no = db.query(WorkOrder).filter(WorkOrder.order_id == next_id).first()
         if no:
-            no.agent_id = agent_id
-            no.call_start_time = datetime.now()
-            no.order_status = 1
-            no.update_time = datetime.now()
-            db.commit()
+            try:
+                java_client.accept_order(agent_id, next_id)
+            except Exception as e:
+                log.error(f"通过 Java API 自动接单失败，降级直接写库: orderId={next_id}, error={e}")
+                no.agent_id = agent_id
+                no.call_start_time = datetime.now()
+                no.order_status = 1
+                no.update_time = datetime.now()
+                db.commit()
+                db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).update(
+                    {"agent_status": 1})
+                db.commit()
             # 坐席保持 busy
             rm.set_agent_status(agent_id, "busy")
-            db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).update(
-                {"agent_status": 1})
-            db.commit()
             log.info(f"[自动接单] 坐席接手下一个工单#{next_id}")
             next_info = {
                 "next_order_id": next_id,
@@ -1372,15 +1410,19 @@ async def dialogue_stream(order_id: int, db: Session = Depends(get_db)):
 # ═══════════════════════════════════════════════════════════════
 
 def _save_dialogue(db: Session, order_id: int, content: str, role: str):
-    """保存对话到数据库"""
-    dialogue = DialogueDetail(
-        order_id=order_id,
-        content=content,
-        role=role,
-        msg_time=datetime.now(),
-    )
-    db.add(dialogue)
-    db.commit()
+    """保存对话到数据库（通过 Java API 落库 dialogue_detail）"""
+    try:
+        java_client.save_dialogue(order_id, content, role)
+    except Exception as e:
+        log.error(f"通过 Java API 保存对话失败，降级直接写库: orderId={order_id}, error={e}")
+        dialogue = DialogueDetail(
+            order_id=order_id,
+            content=content,
+            role=role,
+            msg_time=datetime.now(),
+        )
+        db.add(dialogue)
+        db.commit()
 
 
 def _trigger_transfer(order_id: int, reason: str, db: Session):
@@ -1443,10 +1485,15 @@ def _trigger_transfer(order_id: int, reason: str, db: Session):
             ai_summary = reason
             log.info(f"[AI摘要] 工单#{order_id}: {ai_summary}（无对话历史）")
 
-        order.ai_solved = 0
-        order.ai_failure_note = ai_summary
-        order.update_time = datetime.now()
-        db.commit()
+        # 通过 Java API 更新工单转人工信息
+        try:
+            java_client.update_order(order_id, ai_solved=0, ai_failure_note=ai_summary)
+        except Exception as e:
+            log.error(f"通过 Java API 更新工单转人工信息失败，降级直接写库: orderId={order_id}, error={e}")
+            order.ai_solved = 0
+            order.ai_failure_note = ai_summary
+            order.update_time = datetime.now()
+            db.commit()
 
         # 入人工坐席排队队列
         position = rm.enqueue_agent(order_id, order.phone, ai_summary)
@@ -1458,12 +1505,22 @@ def _trigger_transfer(order_id: int, reason: str, db: Session):
         agent = db.query(AgentInfo).filter(AgentInfo.agent_id == agent_id).first()
         if agent:
             rm.set_agent_status(agent_id, "busy")
-            agent.agent_status = 1
+            try:
+                java_client.update_agent_status(agent_id, 1)
+            except Exception as e:
+                log.error(f"通过 Java API 更新坐席状态失败，降级直接写库: agentId={agent_id}, error={e}")
+                agent.agent_status = 1
+                db.commit()
         
             if order:
-                order.agent_id = agent_id
-                order.call_start_time = datetime.now()
-            db.commit()
+                try:
+                    java_client.update_order(order_id, agent_id=agent_id, call_start_time=datetime.now())
+                except Exception as e:
+                    log.error(f"通过 Java API 更新工单坐席失败，降级直接写库: orderId={order_id}, error={e}")
+                    order.agent_id = agent_id
+                    order.call_start_time = datetime.now()
+                    order.update_time = datetime.now()
+                    db.commit()
             log.agent_answer(agent.agent_name, order_id)
 
             # 调用 CCC 盲转，将通话转接给人工坐席
@@ -1611,19 +1668,37 @@ def _extract_conversation_id(payload: dict) -> str:
 
 def _create_order_internal(db: Session, phone: str, conversation_id: str,
                            instance_id: str, order_type: int = 1):
-    """内部创建工单逻辑（供 API 和事件处理器共用）"""
-    order = WorkOrder(
-        phone=phone,
-        conversation_id=conversation_id,
-        instance_id=instance_id,
-        order_type=order_type,
-        order_status=1,
-        created_time=datetime.now(),
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-    return order
+    """内部创建工单逻辑（通过 Java API 创建，供 API 和事件处理器共用）"""
+    try:
+        result = java_client.create_order(phone, conversation_id, instance_id, order_type)
+        order_id = result.get("orderId")
+        if not order_id:
+            raise RuntimeError(f"Java API 返回的 orderId 为空: {result}")
+        # 构造一个轻量对象返回，兼容调用方
+        order = WorkOrder(
+            order_id=order_id,
+            phone=phone,
+            conversation_id=conversation_id,
+            instance_id=instance_id,
+            order_type=order_type,
+            order_status=1,
+        )
+        log.info(f"通过 Java API 创建工单成功: orderId={order_id}, conversationId={conversation_id}")
+        return order
+    except Exception as e:
+        log.error(f"通过 Java API 创建工单失败，降级直接写库: {e}")
+        order = WorkOrder(
+            phone=phone,
+            conversation_id=conversation_id,
+            instance_id=instance_id,
+            order_type=order_type,
+            order_status=1,
+            created_time=datetime.now(),
+        )
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
 
 
 def _assign_robot_slot_internal(db: Session, order_id: int, phone: str) -> dict:
@@ -1690,19 +1765,24 @@ def _handle_call_answered(payload: dict, db: Session):
         log.info(f"Established 未找到工单 conv={conv_id}")
         return
 
-    # 关联坐席到工单
+    # 关联坐席到工单（通过 Java API 落库）
     if agent_id:
         agent = db.query(AgentInfo).filter(
             AgentInfo.ccc_agent_id == agent_id
         ).first()
         if agent:
-            order.agent_id = agent.agent_id
-            agent.agent_status = 1  # busy
+            try:
+                java_client.update_order(order.order_id, agent_id=agent.agent_id)
+                java_client.update_agent_status(agent.agent_id, 1)
+            except Exception as e:
+                log.error(f"通过 Java API 关联坐席失败，降级直接写库: orderId={order.order_id}, error={e}")
+                order.agent_id = agent.agent_id
+                agent.agent_status = 1  # busy
+                order.update_time = datetime.now()
+                db.commit()
         
             rm.set_agent_status(agent.agent_id, "busy")
             log.agent_answer(agent.agent_name, order.order_id)
-    order.update_time = datetime.now()
-    db.commit()
 
 
 def _handle_call_hangup(payload: dict, db: Session):
@@ -1749,41 +1829,57 @@ def _handle_call_hangup(payload: dict, db: Session):
     if slot_id and not order.ai_failure_note and not order.agent_id:
         ai_solved = 1
 
-    order.ai_solved = ai_solved
+    # 构建工单更新数据
+    update_data = {"ai_solved": ai_solved}
 
     # 3. 时间字段处理
     if ai_solved:
         # AI 解决: call_start_time 保持为通话开始时间，不重置
-        # call_start_time 保持为通话开始时间，不重置
-        order.call_end_time = None
-        order.order_status = 2  # 已办结
+        update_data["order_status"] = 2  # 已办结
         # 生成 AI 对话摘要（作为工单总结）
         history = rm.get_history(order_id)
         if history:
             try:
                 ai_summary = llm_skill.summarize(history, role="ai")
                 if ai_summary and ai_summary.strip():
-                    order.ai_failure_note = ai_summary
+                    update_data["ai_failure_note"] = ai_summary
                     log.info(f"[AI摘要] 工单#{order_id}: {ai_summary[:80]}")
                 else:
-                    order.ai_failure_note = "AI 对话已结束"
+                    update_data["ai_failure_note"] = "AI 对话已结束"
             except Exception as e:
                 log.error(f"AI 摘要生成失败: {e}")
-                order.ai_failure_note = "AI 对话已结束"
+                update_data["ai_failure_note"] = "AI 对话已结束"
         else:
-            order.ai_failure_note = "AI 对话已结束"
+            update_data["ai_failure_note"] = "AI 对话已结束"
     else:
         # 转人工: 如果有 agent_id 说明已被人工坐席接听，按挂断处理
         # 如果没有 agent_id 说明还在排队，不设置 call_end_time
         if order.agent_id:
-            order.call_end_time = datetime.now()
-            order.order_status = 2
+            update_data["call_end_time"] = datetime.now()
+            update_data["order_status"] = 2
         else:
             # 仍在排队中挂断 → 主动挂断
-            order.order_status = 0
+            update_data["order_status"] = 0
 
-    order.update_time = datetime.now()
-    db.commit()
+    # 通过 Java API 更新工单
+    try:
+        java_client.update_order(order_id, **update_data)
+        # 同步本地对象（供后续 duration 日志使用）
+        if "call_end_time" in update_data:
+            order.call_end_time = update_data["call_end_time"]
+        if "order_status" in update_data:
+            order.order_status = update_data["order_status"]
+    except Exception as e:
+        log.error(f"通过 Java API 更新挂机工单失败，降级直接写库: orderId={order_id}, error={e}")
+        order.ai_solved = update_data.get("ai_solved", order.ai_solved)
+        if "ai_failure_note" in update_data:
+            order.ai_failure_note = update_data["ai_failure_note"]
+        if "call_end_time" in update_data:
+            order.call_end_time = update_data["call_end_time"]
+        if "order_status" in update_data:
+            order.order_status = update_data["order_status"]
+        order.update_time = datetime.now()
+        db.commit()
 
     # 通话时长日志（仅人工处理完时有意义）
     duration = 0
@@ -1825,18 +1921,23 @@ def _handle_transfer_completed(payload: dict, db: Session):
     if not order:
         return
 
-    # 关联坐席
+    # 关联坐席（通过 Java API 落库）
     if agent_id:
         agent = db.query(AgentInfo).filter(
             AgentInfo.ccc_agent_id == agent_id
         ).first()
         if agent:
-            order.agent_id = agent.agent_id
-            agent.agent_status = 1
+            try:
+                java_client.update_order(order.order_id, agent_id=agent.agent_id)
+                java_client.update_agent_status(agent.agent_id, 1)
+            except Exception as e:
+                log.error(f"通过 Java API 关联坐席失败，降级直接写库: orderId={order.order_id}, error={e}")
+                order.agent_id = agent.agent_id
+                agent.agent_status = 1
+                order.update_time = datetime.now()
+                db.commit()
         
             rm.set_agent_status(agent.agent_id, "busy")
-    order.update_time = datetime.now()
-    db.commit()
 
 
 def _handle_transfer_failed(payload: dict, db: Session):
@@ -1852,10 +1953,14 @@ def _handle_transfer_failed(payload: dict, db: Session):
     if not order:
         return
 
-    # 追加失败原因，触发重转
-    order.ai_failure_note = f"转接失败: {reason}"
-    order.update_time = datetime.now()
-    db.commit()
+    # 追加失败原因，触发重转（通过 Java API 落库）
+    try:
+        java_client.update_order(order.order_id, ai_failure_note=f"转接失败: {reason}")
+    except Exception as e:
+        log.error(f"通过 Java API 更新转接失败原因失败，降级直接写库: orderId={order.order_id}, error={e}")
+        order.ai_failure_note = f"转接失败: {reason}"
+        order.update_time = datetime.now()
+        db.commit()
 
     # 触发重新转人工
     _trigger_transfer(order.order_id, f"转接失败重试: {reason}", db)
@@ -1909,9 +2014,14 @@ def _handle_agent_status_change(payload: dict, db: Session):
     status_info = _AGENT_STATUS_MAP.get(event_type, ("busy", 1))
     redis_status, db_status = status_info
 
-    agent.agent_status = db_status
+    # 通过 Java API 更新坐席状态
+    try:
+        java_client.update_agent_status(agent.agent_id, db_status)
+    except Exception as e:
+        log.error(f"通过 Java API 更新坐席状态失败，降级直接写库: agentId={agent.agent_id}, error={e}")
+        agent.agent_status = db_status
+        db.commit()
     rm.set_agent_status(agent.agent_id, redis_status)
-    db.commit()
 
 
 def _handle_asr_sentence_result(payload: dict, db: Session):
@@ -2168,10 +2278,15 @@ def _cleanup_robot_transfer(db: Session, order_id: int):
         else:
             ai_summary = "用户按键转人工"
 
-        order.ai_failure_note = ai_summary
-        order.ai_solved = 0
-        order.update_time = datetime.now()
-        db.commit()
+        # 通过 Java API 更新工单机器人清理信息
+        try:
+            java_client.update_order(order_id, ai_failure_note=ai_summary, ai_solved=0)
+        except Exception as e:
+            log.error(f"通过 Java API 更新工单清理信息失败，降级直接写库: orderId={order_id}, error={e}")
+            order.ai_failure_note = ai_summary
+            order.ai_solved = 0
+            order.update_time = datetime.now()
+            db.commit()
         log.info(f"_cleanup_robot_transfer 工单#{order_id} 机器人清理完成")
 
     # 从智能坐席队列取下一个用户
@@ -2220,23 +2335,37 @@ def _handle_assign_agent(payload: dict, db: Session):
         log.info(f"AssignAgent 分配智能坐席 #{order.order_id} agent={agent_id}")
         _assign_robot_slot_internal(db, order.order_id, order.phone)
     else:
-        # 人工坐席 → 先清理机器人资源（兜底），再关联坐席
+        # 人工坐席 → 先清理机器人资源（兜底），再关联坐席（通过 Java API 落库）
         _cleanup_robot_transfer(db, order.order_id)
         log.info(f"AssignAgent 分配人工坐席 #{order.order_id} agent={agent_id}")
+        update_data = {"call_start_time": datetime.now()}
         if agent_id:
             agent = db.query(AgentInfo).filter(
                 AgentInfo.ccc_agent_id == agent_id
             ).first()
             if agent:
-                order.agent_id = agent.agent_id
-                agent.agent_status = 1  # busy
+                update_data["agent_id"] = agent.agent_id
                 rm.set_agent_status(agent.agent_id, "busy")
                 log.agent_answer(agent.agent_name, order.order_id)
+                # 通过 Java API 更新坐席状态
+                try:
+                    java_client.update_agent_status(agent.agent_id, 1)
+                except Exception as e:
+                    log.error(f"通过 Java API 更新坐席状态失败，降级直接写库: agentId={agent.agent_id}, error={e}")
+                    agent.agent_status = 1
+                    db.commit()
             else:
                 log.error(f"AssignAgent 未找到本地坐席记录 ccc_agent_id={agent_id}")
-        order.call_start_time = datetime.now()
-        order.update_time = datetime.now()
-        db.commit()
+        # 通过 Java API 更新工单
+        try:
+            java_client.update_order(order.order_id, **update_data)
+        except Exception as e:
+            log.error(f"通过 Java API 更新工单失败，降级直接写库: orderId={order.order_id}, error={e}")
+            if "agent_id" in update_data:
+                order.agent_id = update_data["agent_id"]
+            order.call_start_time = update_data["call_start_time"]
+            order.update_time = datetime.now()
+            db.commit()
 
 
 def _handle_ivr_tracking(payload: dict, db: Session):

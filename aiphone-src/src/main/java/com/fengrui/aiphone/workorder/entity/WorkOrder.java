@@ -1,7 +1,6 @@
 package com.fengrui.aiphone.workorder.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -35,6 +34,5 @@ public class WorkOrder {
     private String bizSummary;
     private String aiFailureNote;
     private Integer aiSolved;
-    @TableField(exist = false)  // 旧表无此列，暂时不映射，后续 ALTER 补列后去掉此注解
     private Integer summaryConfirmed;
 }

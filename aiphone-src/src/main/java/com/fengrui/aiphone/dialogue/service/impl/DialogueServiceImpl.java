@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fengrui.aiphone.dialogue.entity.DialogueDetail;
 import com.fengrui.aiphone.dialogue.mapper.DialogueDetailMapper;
 import com.fengrui.aiphone.dialogue.service.DialogueService;
+import com.fengrui.aiphone.dialogue.vo.DialogueSaveVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -183,6 +184,22 @@ public class DialogueServiceImpl implements DialogueService {
     @Override
     public int activeEmitterCount() {
         return emitterMap.size();
+    }
+
+    @Override
+    public DialogueSaveVO saveDirect(Long orderId, String content, String role) {
+        DialogueDetail d = new DialogueDetail();
+        d.setOrderId(orderId);
+        d.setContent(content);
+        d.setRole(role);
+        d.setMsgTime(LocalDateTime.now());
+        dialogueDetailMapper.insert(d);
+
+        DialogueSaveVO vo = new DialogueSaveVO();
+        vo.setDiaId(d.getDiaId());
+        vo.setMsgTime(d.getMsgTime());
+        log.info("对话明细已直接落库: orderId={}, diaId={}, role={}", orderId, d.getDiaId(), role);
+        return vo;
     }
 
     /**

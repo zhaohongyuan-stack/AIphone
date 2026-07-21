@@ -67,4 +67,13 @@ public interface WorkOrderService {
     PhoneHistoryVO listByPhone(String phone, Integer limit);
 
     OrderStatusUpdateVO confirmOrder(Long orderId, Integer orderStatus);
+
+    /**
+     * 工单流转推送（办结 + 设置 call_end_time）。
+     * <p>Python 端调用：工单完结后流转到下游处理。</p>
+     *
+     * @param orderId 工单 ID
+     * @return 更新结果
+     */
+    OrderStatusUpdateVO dispatchOrder(Long orderId);
 }

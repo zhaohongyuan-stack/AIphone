@@ -2,6 +2,8 @@ package com.fengrui.aiphone.agent.service;
 
 import com.fengrui.aiphone.agent.dto.req.AgentStatusUpdateReq;
 import com.fengrui.aiphone.agent.entity.AgentInfo;
+import com.fengrui.aiphone.agent.vo.AgentAcceptVO;
+import com.fengrui.aiphone.agent.vo.AgentCompleteVO;
 import com.fengrui.aiphone.agent.vo.AgentStatusUpdateVO;
 import com.fengrui.aiphone.agent.vo.AgentVO;
 
@@ -40,4 +42,18 @@ public interface AgentInfoService {
      * 查询全量坐席列表（供前端下拉选）。
      */
     List<AgentVO> listAgents();
+
+    /**
+     * 坐席接单（Python 端调用：事务性更新 work_order + agent_info）。
+     * <p>更新 work_order.agent_id / call_start_time / order_status=1，
+     * 同时更新 agent_info.agent_status=1（正忙）。</p>
+     */
+    AgentAcceptVO acceptOrder(Long agentId, Long orderId);
+
+    /**
+     * 坐席办结（Python 端调用：事务性更新 work_order + agent_info）。
+     * <p>更新 work_order.biz_summary / call_end_time / order_status=2 / ai_solved=0，
+     * 同时更新 agent_info.agent_status=2（在线空闲）。</p>
+     */
+    AgentCompleteVO completeOrder(Long orderId, Long agentId, String manualSummary);
 }

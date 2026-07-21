@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # 智能坐席槽位
     ROBOT_SLOT_COUNT: int = 2
 
+    # ── Java 后端 API 地址（Docker 内部服务名）──
+    JAVA_API_BASE_URL: str = "http://java-backend:8080"
+
     # 机器人坐席状态独立数据库（本地 SQLite，与 RDS 工单库隔离）
     ROBOT_DB_PATH: str = "robot_agent.db"
 

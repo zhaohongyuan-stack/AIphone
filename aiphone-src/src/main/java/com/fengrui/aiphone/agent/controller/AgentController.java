@@ -1,7 +1,11 @@
 package com.fengrui.aiphone.agent.controller;
 
+import com.fengrui.aiphone.agent.dto.req.AgentAcceptReq;
+import com.fengrui.aiphone.agent.dto.req.AgentCompleteReq;
 import com.fengrui.aiphone.agent.dto.req.AgentStatusUpdateReq;
 import com.fengrui.aiphone.agent.service.AgentInfoService;
+import com.fengrui.aiphone.agent.vo.AgentAcceptVO;
+import com.fengrui.aiphone.agent.vo.AgentCompleteVO;
 import com.fengrui.aiphone.agent.vo.AgentStatusUpdateVO;
 import com.fengrui.aiphone.agent.vo.AgentVO;
 import com.fengrui.aiphone.common.Result;
@@ -31,5 +35,18 @@ public class AgentController {
     @GetMapping("/list")
     public Result<List<AgentVO>> list() {
         return Result.success(agentInfoService.listAgents());
+    }
+
+    /** 坐席接单（Python 端调用：事务性更新工单 + 坐席状态） */
+    @PostMapping("/accept")
+    public Result<AgentAcceptVO> accept(@Valid @RequestBody AgentAcceptReq req) {
+        return Result.success("接单成功", agentInfoService.acceptOrder(req.getAgentId(), req.getOrderId()));
+    }
+
+    /** 坐席办结（Python 端调用：事务性更新工单 + 释放坐席） */
+    @PostMapping("/complete")
+    public Result<AgentCompleteVO> complete(@Valid @RequestBody AgentCompleteReq req) {
+        return Result.success("办结成功",
+                agentInfoService.completeOrder(req.getOrderId(), req.getAgentId(), req.getManualSummary()));
     }
 }

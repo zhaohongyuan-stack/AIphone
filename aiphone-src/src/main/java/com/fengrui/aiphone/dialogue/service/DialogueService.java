@@ -1,5 +1,6 @@
 package com.fengrui.aiphone.dialogue.service;
 
+import com.fengrui.aiphone.dialogue.vo.DialogueSaveVO;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -58,4 +59,16 @@ public interface DialogueService {
      * 查询当前活跃的 SSE 连接数（仅用于开发测试验证连接清理）。
      */
     int activeEmitterCount();
+
+    /**
+     * 直接保存对话明细到数据库（Python 端调用）。
+     * <p>与 saveAndPush 不同，此方法直接 INSERT 到 dialogue_detail 表，不经过 Redis 缓冲。
+     * 用于 Python Beebot 对话场景（AI 欢迎语、AI 回答、用户输入等需要立即落库的对话）。</p>
+     *
+     * @param orderId 工单 ID
+     * @param content 文本内容
+     * @param role    发言角色（AI/user/worker/ivr）
+     * @return 保存结果（含 diaId 和 msgTime）
+     */
+    DialogueSaveVO saveDirect(Long orderId, String content, String role);
 }

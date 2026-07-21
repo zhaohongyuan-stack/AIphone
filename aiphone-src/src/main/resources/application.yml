@@ -20,7 +20,7 @@ spring:
     password: secret
   sql:
     init:
-      mode: always
+      mode: never
       schema-locations: classpath:schema.sql
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss

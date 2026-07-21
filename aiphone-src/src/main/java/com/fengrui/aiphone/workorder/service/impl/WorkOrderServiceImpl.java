@@ -142,12 +142,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (req.getEntCerdit() != null) wrapper.set(WorkOrder::getEntCerdit, req.getEntCerdit());
         if (req.getContactName() != null) wrapper.set(WorkOrder::getContactName, req.getContactName());
         if (req.getBizSummary() != null) wrapper.set(WorkOrder::getBizSummary, req.getBizSummary());
-        // summary_confirmed 列暂缺，跳过（后续 ALTER 补列后恢复）
-        // if (req.getSummaryConfirmed() != null) wrapper.set(WorkOrder::getSummaryConfirmed, req.getSummaryConfirmed());
+        if (req.getSummaryConfirmed() != null) wrapper.set(WorkOrder::getSummaryConfirmed, req.getSummaryConfirmed());
         if (req.getOrderType() != null) wrapper.set(WorkOrder::getOrderType, req.getOrderType());
         if (req.getAgentId() != null) wrapper.set(WorkOrder::getAgentId, req.getAgentId());
         if (req.getAiSolved() != null) wrapper.set(WorkOrder::getAiSolved, req.getAiSolved());
         if (req.getAiFailureNote() != null) wrapper.set(WorkOrder::getAiFailureNote, req.getAiFailureNote());
+        if (req.getOrderStatus() != null) wrapper.set(WorkOrder::getOrderStatus, req.getOrderStatus());
+        if (req.getPhone() != null) wrapper.set(WorkOrder::getPhone, req.getPhone());
+        if (req.getCallStartTime() != null) wrapper.set(WorkOrder::getCallStartTime, req.getCallStartTime());
+        if (req.getCallEndTime() != null) wrapper.set(WorkOrder::getCallEndTime, req.getCallEndTime());
         wrapper.set(WorkOrder::getUpdateTime, LocalDateTime.now());
         workOrderMapper.update(null, wrapper);
 
@@ -234,6 +237,27 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         OrderStatusUpdateVO vo = new OrderStatusUpdateVO();
         vo.setOrderId(orderId);
         vo.setOrderStatus(orderStatus);
+        vo.setUpdateTime(LocalDateTime.now());
+        return vo;
+    }
+
+    @Override
+    @Transactional
+    public OrderStatusUpdateVO dispatchOrder(Long orderId) {
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException("工单不存在: " + orderId);
+        }
+        LambdaUpdateWrapper<WorkOrder> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(WorkOrder::getOrderId, orderId)
+               .set(WorkOrder::getOrderStatus, OrderStatusEnum.DONE.getCode())
+               .set(WorkOrder::getCallEndTime, LocalDateTime.now())
+               .set(WorkOrder::getUpdateTime, LocalDateTime.now());
+        workOrderMapper.update(null, wrapper);
+
+        OrderStatusUpdateVO vo = new OrderStatusUpdateVO();
+        vo.setOrderId(orderId);
+        vo.setOrderStatus(OrderStatusEnum.DONE.getCode());
         vo.setUpdateTime(LocalDateTime.now());
         return vo;
     }

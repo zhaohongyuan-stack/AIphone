@@ -6,11 +6,15 @@ import com.fengrui.aiphone.agent.dto.req.AgentStatusUpdateReq;
 import com.fengrui.aiphone.agent.entity.AgentInfo;
 import com.fengrui.aiphone.agent.mapper.AgentInfoMapper;
 import com.fengrui.aiphone.agent.service.AgentInfoService;
+import com.fengrui.aiphone.agent.vo.AgentAcceptVO;
+import com.fengrui.aiphone.agent.vo.AgentCompleteVO;
 import com.fengrui.aiphone.agent.vo.AgentStatusUpdateVO;
 import com.fengrui.aiphone.agent.vo.AgentVO;
 import com.fengrui.aiphone.common.enums.AgentStatusEnum;
 import com.fengrui.aiphone.exception.BusinessException;
 import com.fengrui.aiphone.platform.aliyun.ccc.client.CccAgentClient;
+import com.fengrui.aiphone.workorder.entity.WorkOrder;
+import com.fengrui.aiphone.workorder.mapper.WorkOrderMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +46,9 @@ public class AgentInfoServiceImpl implements AgentInfoService {
 
     @Autowired
     private CccAgentClient cccAgentClient;
+
+    @Autowired
+    private WorkOrderMapper workOrderMapper;
 
     @Override
     @Transactional
@@ -121,5 +128,75 @@ public class AgentInfoServiceImpl implements AgentInfoService {
             vo.setAgentStatus(a.getAgentStatus());
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public AgentAcceptVO acceptOrder(Long agentId, Long orderId) {
+        // 1. 更新工单：关联坐席 + 设置通话开始时间 + 状态处理中
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException("工单不存在: " + orderId);
+        }
+        LambdaUpdateWrapper<WorkOrder> orderWrapper = new LambdaUpdateWrapper<>();
+        orderWrapper.eq(WorkOrder::getOrderId, orderId)
+                    .set(WorkOrder::getAgentId, agentId)
+                    .set(WorkOrder::getCallStartTime, LocalDateTime.now())
+                    .set(WorkOrder::getOrderStatus, 1) // 处理中
+                    .set(WorkOrder::getUpdateTime, LocalDateTime.now());
+        workOrderMapper.update(null, orderWrapper);
+
+        // 2. 更新坐席状态为正忙
+        LambdaUpdateWrapper<AgentInfo> agentWrapper = new LambdaUpdateWrapper<>();
+        agentWrapper.eq(AgentInfo::getAgentId, agentId)
+                    .set(AgentInfo::getAgentStatus, AgentStatusEnum.BUSY.getCode());
+        agentInfoMapper.update(null, agentWrapper);
+
+        // 3. 更新 Redis
+        redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + agentId, AgentStatusEnum.BUSY.getCode());
+
+        AgentAcceptVO vo = new AgentAcceptVO();
+        vo.setOrderId(orderId);
+        vo.setAgentId(agentId);
+        vo.setAgentStatus(AgentStatusEnum.BUSY.getCode());
+        vo.setCallStartTime(LocalDateTime.now());
+        log.info("坐席接单成功: agentId={}, orderId={}", agentId, orderId);
+        return vo;
+    }
+
+    @Override
+    @Transactional
+    public AgentCompleteVO completeOrder(Long orderId, Long agentId, String manualSummary) {
+        // 1. 更新工单：摘要 + 通话结束时间 + 状态办结 + AI 未解决
+        WorkOrder order = workOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException("工单不存在: " + orderId);
+        }
+        LambdaUpdateWrapper<WorkOrder> orderWrapper = new LambdaUpdateWrapper<>();
+        orderWrapper.eq(WorkOrder::getOrderId, orderId)
+                    .set(WorkOrder::getBizSummary, manualSummary)
+                    .set(WorkOrder::getCallEndTime, LocalDateTime.now())
+                    .set(WorkOrder::getOrderStatus, 2) // 已办结
+                    .set(WorkOrder::getAiSolved, 0)
+                    .set(WorkOrder::getUpdateTime, LocalDateTime.now());
+        workOrderMapper.update(null, orderWrapper);
+
+        // 2. 释放坐席为在线空闲
+        LambdaUpdateWrapper<AgentInfo> agentWrapper = new LambdaUpdateWrapper<>();
+        agentWrapper.eq(AgentInfo::getAgentId, agentId)
+                    .set(AgentInfo::getAgentStatus, AgentStatusEnum.ONLINE.getCode());
+        agentInfoMapper.update(null, agentWrapper);
+
+        // 3. 更新 Redis
+        redisTemplate.opsForValue().set(REDIS_KEY_PREFIX + agentId, AgentStatusEnum.ONLINE.getCode());
+
+        AgentCompleteVO vo = new AgentCompleteVO();
+        vo.setOrderId(orderId);
+        vo.setAgentId(agentId);
+        vo.setAgentStatus(AgentStatusEnum.ONLINE.getCode());
+        vo.setBizSummary(manualSummary);
+        vo.setCallEndTime(LocalDateTime.now());
+        log.info("坐席办结成功: agentId={}, orderId={}", agentId, orderId);
+        return vo;
     }
 }

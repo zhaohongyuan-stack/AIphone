@@ -38,5 +38,5 @@ ENV JAVA_OPTS="-Xms512m -Xmx512m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -X
 # 暴露应用端口
 EXPOSE 8080
 
-# 启动命令
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=prod -jar app.jar"]
+# 启动命令（通过 SPRING_PROFILES_ACTIVE 环境变量切换 profile，默认 docker）
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-docker} -jar app.jar"]

@@ -65,4 +65,10 @@ public class WorkOrderController {
                                                @Valid @RequestBody OrderStatusUpdateReq req) {
         return Result.success("状态更新成功", workOrderService.confirmOrder(orderId, req.getOrderStatus()));
     }
+
+    /** 7. 工单流转推送（Python 端调用：办结 + 设置 call_end_time） */
+    @PostMapping("/{order_id}/dispatch")
+    public Result<OrderStatusUpdateVO> dispatch(@PathVariable("order_id") Long orderId) {
+        return Result.success("工单流转成功", workOrderService.dispatchOrder(orderId));
+    }
 }
