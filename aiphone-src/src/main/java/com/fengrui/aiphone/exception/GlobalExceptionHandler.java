@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.ResponseEntity;
 
 import java.util.stream.Collectors;
 
@@ -20,9 +21,13 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusiness(BusinessException e) {
+    public ResponseEntity<Result<Void>> handleBusiness(BusinessException e) {
         log.warn("业务异常: {}", e.getMessage());
-        return Result.error(e.getCode(), e.getMessage());
+        Result<Void> result = Result.error(e.getCode(), e.getMessage());
+        if (e.getCode() >= 400 && e.getCode() < 600) {
+            return ResponseEntity.status(e.getCode()).body(result);
+        }
+        return ResponseEntity.ok(result);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -1,6 +1,8 @@
 # ============================================================
 #  AiPhone 统一 Docker 编排
 #  Java 后端 (:8080) + Python IVR (:8000) + PostgreSQL + Redis
+#  PG 和 Redis 不映射宿主机端口（避免和服务器本地服务冲突）
+#  容器间通过 Docker 内部网络（aiphone-net）访问
 #  使用方式：
 #    1. 复制 .env.example 为 .env，填入真实凭证
 #    2. docker compose up -d
@@ -18,8 +20,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
       TZ: Asia/Shanghai
+    # 映射到宿主机 5433 供 pgAdmin 连接（5432 被本地 PG 占用）
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     networks:
@@ -36,8 +39,9 @@ services:
     container_name: aiphone-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
+    # 不映射到宿主机，避免和本地 Redis 冲突
+    expose:
+      - "6379"
     volumes:
       - redis-data:/data
     networks:
@@ -70,7 +74,6 @@ services:
       CCC_MQ_ENDPOINT: ${ROCKETMQ_ENDPOINT}
       CCC_MQ_TOPIC: dadong
       CCC_MQ_GROUP: GID_CCC_JAVA_CONSUMER
-      # RocketMQ 5.x 公网访问必须填写实例用户名/密码/命名空间（实例ID）
       CCC_MQ_USERNAME: ${ROCKETMQ_ACCESS_KEY}
       CCC_MQ_PASSWORD: ${ROCKETMQ_ACCESS_SECRET}
       CCC_MQ_NAMESPACE: ${ROCKETMQ_INSTANCE_ID}
@@ -120,12 +123,12 @@ services:
     networks:
       - aiphone-net
 
+networks:
+  aiphone-net:
+    driver: bridge
+
 volumes:
   pg-data:
   redis-data:
   java-logs:
   python-data:
-
-networks:
-  aiphone-net:
-    driver: bridge

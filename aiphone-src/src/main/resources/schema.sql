@@ -72,6 +72,22 @@ CREATE INDEX IF NOT EXISTS idx_agent_status ON agent_info(agent_status);
 CREATE INDEX IF NOT EXISTS idx_agent_ccc_id ON agent_info(ccc_agent_id);
 
 -- ==============================================
+-- 4.1 登录用户表
+-- ==============================================
+CREATE TABLE IF NOT EXISTS app_user (
+    user_id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(100) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'ADMIN',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_user_enabled ON app_user(enabled);
+
+-- ==============================================
 -- 5. 表与字段注释（便于维护）
 -- ==============================================
 COMMENT ON TABLE work_order IS '主工单表：存储来电工单核心信息';
@@ -107,3 +123,7 @@ COMMENT ON COLUMN agent_info.agent_id IS '坐席主键';
 COMMENT ON COLUMN agent_info.agent_name IS '坐席姓名';
 COMMENT ON COLUMN agent_info.agent_status IS '坐席状态：0-离线 1-正忙 2-在线空闲（以数据库.md 注释为准）';
 COMMENT ON COLUMN agent_info.ccc_agent_id IS 'CCC 平台坐席ID（如 agent@instance-id），用于回调事件中 agentId 映射到本地 agent_id';
+
+COMMENT ON TABLE app_user IS '系统登录用户表';
+COMMENT ON COLUMN app_user.username IS '唯一登录账号';
+COMMENT ON COLUMN app_user.password_hash IS 'BCrypt 密码哈希，不保存明文密码';

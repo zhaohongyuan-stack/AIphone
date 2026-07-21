@@ -47,8 +47,14 @@ services:
       # 禁用 RabbitMQ 自动配置：pom.xml 有 spring-boot-starter-amqp 但项目未使用，
       # 不排除的话 Spring Boot 启动会尝试连 localhost:5673 失败
       - SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+      # 登录用户表和已有业务表均使用幂等建表脚本，允许新旧数据库平滑升级
+      - SPRING_SQL_INIT_MODE=always
+      # RocketMQ 域名不可解析时不应阻塞登录和工单 Web 接口启动
+      - CCC_MQ_ENABLED=false
       # DashScope API Key（可选，用到 ASR 时才需要）
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      - AUTH_BOOTSTRAP_PASSWORD=${AUTH_BOOTSTRAP_PASSWORD}
     volumes:
       # 日志持久化到宿主机
       - ./logs:/app/logs

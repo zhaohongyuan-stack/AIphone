@@ -1,0 +1,360 @@
+{
+  "info": {
+    "name": "AiPhone API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "aiphone-api-collection-2026"
+  },
+  "variable": [
+    {
+      "key": "JAVA_BASE",
+      "value": "http://8.152.96.62:8080"
+    },
+    {
+      "key": "PYTHON_BASE",
+      "value": "http://8.152.96.62:8000"
+    },
+    {
+      "key": "TOKEN",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Java 后端",
+      "item": [
+        {
+          "name": "1. 登录获取Token",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/auth/login",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+              "type": "text/javascript",
+              "exec": [
+                "var json = pm.response.json();",
+                "if (json.code === 200 && json.data && json.data.token) {",
+                "  pm.collectionVariables.set('TOKEN', json.data.token);",
+                "  console.log('Token已保存: ' + json.data.token.substring(0,20) + '...');",
+                "}"
+              ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. 健康检查",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/actuator/health"
+          }
+        },
+        {
+          "name": "3. 创建工单（免认证，Python调用入口）",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/orders",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"13800138000\",\n  \"conversationId\": \"test-conv-001\",\n  \"instanceId\": \"demo-1334882287961657\",\n  \"orderType\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "4. 工单列表（分页，需Token）",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/api/orders?page=1&size=10",
+            "header": [{"key": "Authorization", "value": "Bearer {{TOKEN}}"}]
+          }
+        },
+        {
+          "name": "5. 工单详情（需Token）",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/api/orders/1",
+            "header": [{"key": "Authorization", "value": "Bearer {{TOKEN}}"}]
+          }
+        },
+        {
+          "name": "5. 更新工单（PATCH）",
+          "request": {
+            "method": "PATCH",
+            "url": "{{JAVA_BASE}}/api/orders/1",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderStatus\": 2,\n  \"bizSummary\": \"测试更新工单摘要\"\n}"
+            }
+          }
+        },
+        {
+          "name": "6. 按电话查历史工单",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/api/orders/by-phone?phone=13800138000&limit=5",
+            "header": [{"key": "Authorization", "value": "Bearer {{TOKEN}}"}]
+          }
+        },
+        {
+          "name": "7. 工单确认",
+          "request": {
+            "method": "PUT",
+            "url": "{{JAVA_BASE}}/api/orders/1/confirm",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderStatus\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "8. 坐席列表",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/api/agent/list",
+            "header": [{"key": "Authorization", "value": "Bearer {{TOKEN}}"}]
+          }
+        },
+        {
+          "name": "9. 更新坐席状态",
+          "request": {
+            "method": "PUT",
+            "url": "{{JAVA_BASE}}/api/agent/status",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agentId\": 1,\n  \"agentStatus\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "10. 坐席接单",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/agent/accept",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": 1,\n  \"agentId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "11. 坐席办结",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/agent/complete",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": 1,\n  \"agentId\": 1,\n  \"bizSummary\": \"问题已解决\"\n}"
+            }
+          }
+        },
+        {
+          "name": "12. 保存对话记录",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/dialogue",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": 1,\n  \"content\": \"测试对话内容\",\n  \"role\": \"user\"\n}"
+            }
+          }
+        },
+        {
+          "name": "13. 工单流转推送",
+          "request": {
+            "method": "POST",
+            "url": "{{JAVA_BASE}}/api/orders/1/dispatch",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderStatus\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "14. SSE实时对话流（需Token）",
+          "request": {
+            "method": "GET",
+            "url": "{{JAVA_BASE}}/api/dialogue/stream/1",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{TOKEN}}"},
+              {"key": "Accept", "value": "text/event-stream"}
+            ]
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Python IVR",
+      "item": [
+        {
+          "name": "1. 坐席列表（调Java API）",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/agents"
+          }
+        },
+        {
+          "name": "2. 坐席状态（含Redis）",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/agents/status"
+          }
+        },
+        {
+          "name": "3. 人工排队队列",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/agent/queue"
+          }
+        },
+        {
+          "name": "4. 排队状态统计",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/agent/queue/status"
+          }
+        },
+        {
+          "name": "5. 智能坐席槽位状态",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/robot-slots/status"
+          }
+        },
+        {
+          "name": "6. 创建工单",
+          "request": {
+            "method": "POST",
+            "url": "{{PYTHON_BASE}}/api/orders",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"13800138000\",\n  \"conversation_id\": \"test-conv-001\",\n  \"instance_id\": \"demo-1334882287961657\",\n  \"order_type\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "7. 查询工单",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/orders/1"
+          }
+        },
+        {
+          "name": "8. 机器人对话",
+          "request": {
+            "method": "POST",
+            "url": "{{PYTHON_BASE}}/api/robot/dialogue",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversation_id\": \"test-conv-001\",\n  \"instance_id\": \"demo-1334882287961657\",\n  \"phone\": \"13800138000\",\n  \"user_input\": \"你好，我想咨询一下\"\n}"
+            }
+          }
+        },
+        {
+          "name": "9. 坐席接单",
+          "request": {
+            "method": "POST",
+            "url": "{{PYTHON_BASE}}/api/agent/accept",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": 1,\n  \"agent_id\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "10. 保存坐席对话",
+          "request": {
+            "method": "POST",
+            "url": "{{PYTHON_BASE}}/api/agent/dialogue",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": 1,\n  \"content\": \"坐席回复内容\",\n  \"role\": \"agent\"\n}"
+            }
+          }
+        },
+        {
+          "name": "11. 坐席办结",
+          "request": {
+            "method": "POST",
+            "url": "{{PYTHON_BASE}}/api/agent/complete",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": 1,\n  \"biz_summary\": \"问题已解决\"\n}"
+            }
+          }
+        },
+        {
+          "name": "12. 质检工单列表",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/quality-inspection/orders?date=2026-07-21&page=1&page_size=10"
+          }
+        },
+        {
+          "name": "13. 更新坐席状态",
+          "request": {
+            "method": "PUT",
+            "url": "{{PYTHON_BASE}}/api/agent/status",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_id\": 1,\n  \"action\": \"ready\"\n}"
+            }
+          }
+        },
+        {
+          "name": "14. SSE实时对话流（免认证）",
+          "request": {
+            "method": "GET",
+            "url": "{{PYTHON_BASE}}/api/dialogue/stream/1",
+            "header": [
+              {"key": "Accept", "value": "text/event-stream"}
+            ]
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
